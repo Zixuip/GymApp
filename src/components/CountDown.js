@@ -1,5 +1,13 @@
-import React, { useRef, useState } from 'react';
-import { View, Dimensions, TouchableOpacity, Animated, StyleSheet, Text } from 'react-native';
+import * as React from 'react';
+import {
+  Vibration,
+  View,
+  Dimensions,
+  TouchableOpacity,
+  Animated,
+  StyleSheet,
+  TextInput,
+} from 'react-native';
 
 import tw from 'tailwind-rn';
 
@@ -9,33 +17,104 @@ const CountDown = () => {
   const ITEM_SIZE = devicesWidth * 0.38;
   const ITEM_SPACING = (devicesWidth - ITEM_SIZE) / 2;
 
-
   const scrollX = React.useRef(new Animated.Value(0)).current;
-  const [duration, setDuration] = useState(timers[0]);
-  const timerAnimation = useRef(new Animated.Value(devicesHeight)).current;
-  const animation = React.useCallback(() => {
+  const [duration, setDuration] = React.useState(timers[0]);
+  const inputRef = React.useRef();
+  const timerAnimation = React.useRef(new Animated.Value(devicesHeight)).current;
+  const textInputAnimation = React.useRef(new Animated.Value(timers[0])).current;
+  const buttonAnimation = React.useRef(new Animated.Value(0)).current;
 
+  React.useEffect(() => {
+    const listener = textInputAnimation.addListener(({ value }) => {
+      inputRef?.current?.setNativeProps({
+        text: Math.ceil(value).toString(),
+      });
+    });
+
+    return () => {
+      textInputAnimation.removeAllListeners(listener);
+      textInputAnimation.removeAllListeners();
+    };
+  });
+
+  const animation = React.useCallback(() => {
+    textInputAnimation.setValue(duration);
     Animated.sequence([
+      Animated.timing(buttonAnimation, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
       Animated.timing(timerAnimation, {
         toValue: 0,
         duration: 300,
         useNativeDriver: true,
       }),
-      Animated.timing(timerAnimation, {
-        toValue: devicesHeight,
-        duration: duration * 1000,
-        useNativeDriver: true,
-      }),
+      Animated.parallel([
+        Animated.timing(textInputAnimation, {
+          toValue: 0,
+          duration: duration * 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(timerAnimation, {
+          toValue: devicesHeight,
+          duration: duration * 1000,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.delay(400),
     ]).start(() => {
-
+      Vibration.cancel();
+      Vibration.vibrate();
+      textInputAnimation.setValue(duration);
+      // buttonAnimation.setValue(0);
+      Animated.timing(buttonAnimation, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
     });
   }, [duration]);
+
+  const opacity = buttonAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0],
+  });
+
+  const translateY = buttonAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 200],
+  });
+
+  const textOpacity = buttonAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
 
   const colors = {
     black: '#323F4E',
     red: '#F76A6A',
     text: '#ffffff',
   };
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.black,
+    },
+    roundButton: {
+      width: 80,
+      height: 80,
+      borderRadius: 80,
+      backgroundColor: colors.red,
+    },
+    text: {
+      fontSize: ITEM_SIZE * 0.8,
+      fontFamily: 'Menlo',
+      color: colors.text,
+      fontWeight: '900',
+    },
+  });
 
   return (
     <View style={tw('flex-1')}>
@@ -53,6 +132,12 @@ const CountDown = () => {
         style={[
           StyleSheet.absoluteFillObject,
           tw('items-center justify-end'),
+          {
+            opacity,
+            transform: [{
+              translateY,
+            }],
+          },
         ]}
       >
         <TouchableOpacity onPress={animation}>
@@ -65,7 +150,22 @@ const CountDown = () => {
           tw('absolute '),
         ]}
       >
-        <Text>{duration}</Text>
+        <Animated.View
+          style={[
+            tw('absolute items-center justify-center'),
+            {
+              width: ITEM_SIZE,
+              alignSelf: 'center',
+              opacity: textOpacity,
+            },
+          ]}
+        >
+          <TextInput
+            ref={inputRef}
+            style={styles.text}
+            defaultValue={duration.toString()}
+          />
+        </Animated.View>
         <Animated.FlatList
           data={timers}
           keyExtractor={item => item.toString()}
@@ -77,7 +177,7 @@ const CountDown = () => {
           contentContainerStyle={{
             paddingHorizontal: ITEM_SPACING,
           }}
-          style={[{ flexGrow: 0 }]}
+          style={[{ flexGrow: 0, opacity }]}
           onScroll={Animated.event(
             [{ nativeEvent: { contentOffset: { x: scrollX } } }],
             { useNativeDriver: true }
@@ -93,24 +193,22 @@ const CountDown = () => {
               (index + 1) * ITEM_SIZE,
             ];
 
-            const opacity = scrollX.interpolate({
-              inputRange,
-              outputRange: [0.4, 1, 0.4],
-            });
-
-            const scale = scrollX.interpolate({
-              inputRange,
-              outputRange: [0.7, 1, 0.7],
-            });
             return (
               <View style={[{ width: ITEM_SIZE }, tw('items-center justify-center')]}>
                 <Animated.Text
                   style={[
-                    tw('font-bold text-white'),
+                    styles.text,
                     {
-                      fontSize: 100,
-                      opacity,
-                      transform: [{ scale }],
+                      opacity: scrollX.interpolate({
+                        inputRange,
+                        outputRange: [0.4, 1, 0.4],
+                      }),
+                      transform: [{
+                        scale: scrollX.interpolate({
+                          inputRange,
+                          outputRange: [0.7, 1, 0.7],
+                        }),
+                      }],
                     },
                   ]}
                 >

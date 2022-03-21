@@ -13,6 +13,7 @@ const RepeatSettingScreen = () => {
 
   const navigation = useNavigation();
   const myInput = useRef('myInput');
+
   useEffect(() => {
     myInput.current.focus();
   });
